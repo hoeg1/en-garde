@@ -4,6 +4,7 @@
 html {
   -webkit-text-size-adjust: 100%; /* 画面回転時の文字サイズ自動調整を防ぐ */
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* タップ時の青い背景を消す */
+  touch-action: manipulation;
 }
 body {
   margin: 0;
