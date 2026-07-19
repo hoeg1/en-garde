@@ -497,7 +497,7 @@ export default class Lv3 extends Lv0 {
         // 一番持ってる確率が少ない場所に突っ込んでみる
         const adv = f5.toSorted((a, b) => prob[a.card_rank] - prob[b.card_rank]);
         // 性格は、数値が高いほど猪突猛進
-        if (prob[ adv[0].card_rank ] < this.seikaku / 2) return adv[0];
+        if (prob[ adv[0].card_rank ] < this.seikaku / 1.2) return adv[0];
       } else {
         // 間合いが５以下になる前進が存在しないなら、最も前進できるカード
         return this.rank_max(forward);
@@ -526,7 +526,7 @@ export default class Lv3 extends Lv0 {
         }
         // 冒険的な後退
         // 一番持ってる確率が少ない場所に移動してみる
-        if (this.seikaku > 0.6) {
+        if (this.seikaku > 0.5) {
           const adv = b5.toSorted((a, b) => prob[a.card_rank] - prob[b.card_rank]);
           return adv[0];
         }
