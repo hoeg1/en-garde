@@ -7,7 +7,7 @@
 import { Rand } from "./rand.js";
 
 // バージョン文字列
-export const VERSION = '0.0.2';
+export const VERSION = '0.0.3';
 
 /**
  * await sleep(x) の形で指定されたミリ秒待つだけの関数

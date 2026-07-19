@@ -1,4 +1,8 @@
 // デバッグとCPUの強さ確認のため自動で100戦させる
+// node testplay.js -p N -q N -m N
+//
+import { parseArgs } from 'node:util';
+import { stdin as input, stdout as output, exit } from "node:process";
 
 import { EnGarde, Board } from "./engarde.js";
 import { Rand } from "./rand.js";
@@ -32,11 +36,7 @@ class Bot extends EnGarde {
               dcnt += 1;
               break;
             } else {
-              return {
-                str: `Win ${this.board.winner} (${this.players[0].vp}vs${this.players[1].vp})`,
-                winner: this.board.winner,
-                vp: [this.players[0].vp, this.players[1].vp],
-              };
+              return this.board.winner;
             }
           }
         } catch (e) {
@@ -64,25 +64,63 @@ function lv_to_inst(lv, rnd, side) {
   }
 }
 
-function vs(lv, LV) {
-  const rnd = new Rand();
-  const p0 = lv_to_inst(lv, rnd, 0);
-  const p1 = lv_to_inst(LV, rnd, 1);
-  const eg = new Bot(p0, p1, rnd, true);
-  const k = eg.run();
-  console.log(`${k.str}, seed: ${rnd}`);
-  return k;
-}
-
-// lv に使いたいCPUのレベルを設定
-const score = [{lv: 1, win: 0, vp: 0}, {lv: 0, win: 0, vp: 0}];
-const test_max = 100;
-for (let i = 0; i < test_max; ++i) {
-  const k = vs(score[0].lv, score[1].lv);
-  score[k.winner].win += 1;
-  score[k.winner].vp += k.vp[k.winner];
-  score[k.winner === 0? 1: 0].vp += k.vp[k.winner === 0? 1: 0];
-}
-console.log(score);
+(function(){
+  const { values } = parseArgs({
+    options: {
+      player0: {
+        type: 'string',
+        short: 'p',
+      },
+      player1: {
+        type: 'string',
+        short: 'q',
+      },
+      max: {
+        type: 'string',
+        short: 'm',
+      },
+    },
+  });
+  const max_level = 3;
+  let pl0 = 3;
+  let pl1 = 2;
+  let max = 100;
+  if (values.player0 !== undefined) {
+    const n = parseInt(values.player0);
+    if (n === NaN || n < 0 || max_level < n) {
+      console.error(`-p '${values.player0}' の解析に失敗`);
+      exit();
+    }
+    pl0 = n;
+  }
+  if (values.player1 !== undefined) {
+    const n = parseInt(values.player1);
+    if (n === NaN || n < 0 || max_level < n) {
+      console.error(`-q '${values.player1}' の解析に失敗`);
+      exit();
+    }
+    pl1 = n;
+  }
+  if (values.max !== undefined) {
+    const n = parseInt(values.max);
+    if (n === NaN || n < 1) {
+      console.error(`-m '${values.max}' の解析に失敗`);
+      exit();
+    }
+    max = n;
+  }
+  console.log(`[ Lv${pl0} vs Lv${pl1} ]`);
+  const w_cnt = [0, 0];
+  for (let i = 0; i < max; ++i) {
+    output.write(`\r\x1b[KWait... ${i.toString().padStart(3,' ')}/${max.toString().padStart(3,' ')}`);
+    const rnd = new Rand();
+    const p0 = lv_to_inst(pl0, rnd, 0);
+    const p1 = lv_to_inst(pl1, rnd, 1);
+    const eg = new Bot(p0, p1, rnd, true);
+    const w = eg.run();
+    w_cnt[w] += 1;
+  }
+  output.write(`\r\x1b[KLv${pl0}: ${(w_cnt[0]/max*100).toFixed(1)}% (${w_cnt[0]}/${max}), Lv${pl1}: ${(w_cnt[1]/max*100).toFixed(1)}% (${w_cnt[1]}/${max})\n`);
+})();
 
 

@@ -52,21 +52,14 @@ class Bot extends EnGarde {
 }
 
 /**
- *
  * ある程度合理的に動くプレイヤーを定義しようとすると、山札の残り枚数が少なく
  * なったタイミングで価値判断の基準を変える必要があると気づく。
  * 同じ前進でも「次にラウンドが終わる」か「終わらない」かでは一手の価値が激変
- * するが、安直には「１手先を読んだときのプログラム」を書きたくなるけれど、
+ * するので、安直に「１手先を読んだときのプログラム」を書きたくなるけれど、
  * それを始めると「ｎ手先を読んだときのプログラム」を延々と書かなければならない。
- * キリがないが、王道の min-max 法は組み合わせ爆発しがちなので、
- * ここではゲームに「序盤・終盤」の別を持ち込み、「山札が７枚」がその基準だと
- * （理由なく）決めつけ、山が７枚以下になったら行動を変えるようにした：
- *    具体的には７枚以下なら各合法手について100回プレイアウトして勝率最多を選ぶ。
- *    相手の手札は board.used から推測し、都度乱数で埋めるものとする。
- * => testplay.js で試すと、この戦略は他のすべてのCPU戦略より強かった。
- *    UCB等は計算していないので効率が悪いし評価値の品質も悪いが…
- * => 結果、ヒト相手だとまだまだプレイにユルさが見えるものの、さしあたり
- *   「手応えある相手」として十分な強さになったと思う。
+ * ここではゲームに「中盤・終盤」の別を持ち込み、「山札が１０枚」がその基準だと
+ * （testpley.jsの感じからなんとなく）決めつけ、
+ * 山が10枚以下になったら行動を変えるようにした
  */
 export default class Lv3 extends Lv0 {
   /**
@@ -97,9 +90,9 @@ export default class Lv3 extends Lv0 {
       return legal[0];
     }
 
-    // 終盤、このあと手番が終わる可能性を考慮しはじめる
-    // 最初に１５枚あるので、ざっくり７枚くらいからを終盤とみなす
-    if (board.deck_len <= 7 && !this.is_playout) {
+    // 中終盤、このあと手番が終わる可能性を考慮し「先の先」を読む
+    // 最初に１５枚あるので、ざっくり10枚くらいからを中終盤とみなす
+    if (board.deck_len <= 10 && !this.is_playout) {
       return this.do_playout(legal, board);
     }
 
@@ -130,7 +123,7 @@ export default class Lv3 extends Lv0 {
    * @return {Te}               合法手のうち得点最多の１手
    */
   do_playout(legal, board) {
-    const max_playout = 100; // プレイアウト回数
+    const max_playout = board.deck_len >= 7? 50: 100; // プレイアウト回数
     for (let i = 0; i < max_playout; ++i) {
       // プレイアウトしまくる
       for (let te of legal) {
@@ -358,26 +351,28 @@ export default class Lv3 extends Lv0 {
         // 最も少ない後退で済むのを返す
         return this.rank_min(fight_back);
       }
-      // 性格による冒険的な前進
-      // 積極的に冒険的な手を打つのは、基本的に後退は悪手だから
-      const prob = calc_prob_for_rank(board.ph_count[ this.my_side == 0? 1: 0], used);
-      const adv = b5.filter( te => {
-        const k = mae + te.card_rank;
-        const kk = Math.max(0, this.hand.has(k) - (k===te.card_rank? 1: 0));
-        return kk + this.seikaku / 2 > prob[ k ];
-      });
-      if (adv.length !== 0) {
-        // 複数あるなら最も小さな後退が良い
-        return this.rank_min(adv);
+      // 自分の手札によらず、相手が持ってないランクの場所は安全
+      const anchi = b5.filter( te => phand[ te.card_rank + mae ] === 0 );
+      if (anchi.length !== 0) {
+        return this.rank_min(anchi);
       }
-    } else {
-      // deck_len が 1 のとき含め
-      // 間合いが５以下を保てないなら最も後を保てるカード
-      return this.rank_min(backward);
-    }
+      // 冒険的な後退
+      // 一番持ってる確率が少ない場所に移動してみる
+      if (this.seikaku > 0.5) {
+        const prob = calc_prob_for_rank(board.ph_count[ this.my_side == 0? 1: 0], used);
+        const adv = b5.toSorted((a, b) => prob[a.card_rank] - prob[b.card_rank]);
+        return adv[0];
+      }
+      // それもダメなら間合いが６以上を探して、最も間合いを保てる場所
+      const lb5 = backward.filter(te => te.card_rank + mae >= 6);
+      if (lb5.length !== 0) {
+        return this.rank_min(lb5);
+      }
+    } // else {}
 
-    // 実際にはここは到達不可能
-    return this.random(legal);
+    // deck_len が 1 のとき含め
+    // 間合いが５以下を保てないなら最も後を保てるカード
+    return this.rank_min(backward);
   }
 
   /**
@@ -493,27 +488,27 @@ export default class Lv3 extends Lv0 {
           // 最も前進できるのを返す
           return this.rank_max(fight_back);
         }
-        // 性格による冒険的な前進
-        const adv = f5.filter( te => {
-          const k = mae - te.card_rank;
-          const kk = Math.max(0, this.hand.has(k) - (k===te.card_rank? 1: 0));
-          return kk + this.seikaku / 2 > prob[ k ];
-        });
-        if (adv.length !== 0) {
-          // 複数あるなら最も前進できる手が良い
-          return this.rank_max(adv);
+        // 自分の手札によらず、相手が持ってないランクの場所は安全
+        const anchi = f5.filter( te => phand[ mae - te.card_rank ] === 0 );
+        if (anchi.length !== 0) {
+          return this.rank_max(anchi);
         }
+        // 性格による冒険的な前進
+        // 一番持ってる確率が少ない場所に突っ込んでみる
+        const adv = f5.toSorted((a, b) => prob[a.card_rank] - prob[b.card_rank]);
+        // 性格は、数値が高いほど猪突猛進
+        if (prob[ adv[0].card_rank ] < this.seikaku / 2) return adv[0];
       } else {
         // 間合いが５以下になる前進が存在しないなら、最も前進できるカード
         return this.rank_max(forward);
       }
-    } // forward
+    } // has forward
 
     const backward = this.filter(legal, Te.Backward);
     if (backward.length !== 0) {
       // 移動した結果、間合いが５以下になる後退をまずは抽出
       const b5 = backward.filter( te => mae + te.card_rank <= 5 );
-      // そのうちで、攻撃されても確実に防御できる間合いの前進を選択
+      // そのうちで、攻撃されても確実に防御できる間合いの後退を選択
       if (b5.length !== 0) {
         const fight_back = b5.filter( te => {
           const k = mae + te.card_rank;
@@ -524,25 +519,30 @@ export default class Lv3 extends Lv0 {
           // 最も少ない後退で済むのを返す
           return this.rank_min(fight_back);
         }
-        // 性格による冒険的な後退
-        // 先に冒険的な手を打つのは、基本的に後退は悪手だから
-        const adv = b5.filter( te => {
-          const k = mae + te.card_rank;
-          const kk = Math.max(0, this.hand.has(k) - (k===te.card_rank? 1: 0));
-          return kk + this.seikaku / 2 > prob[ k ];
-        });
-        if (adv.length !== 0) {
-          // 複数あるなら最も小さな後退が良い
-          return this.rank_min(adv);
+        // 自分の手札によらず、相手が持ってないランクの場所は安全
+        const anchi = b5.filter( te => phand[ te.card_rank + mae ] === 0 );
+        if (anchi.length !== 0) {
+          return this.rank_min(anchi);
+        }
+        // 冒険的な後退
+        // 一番持ってる確率が少ない場所に移動してみる
+        if (this.seikaku > 0.6) {
+          const adv = b5.toSorted((a, b) => prob[a.card_rank] - prob[b.card_rank]);
+          return adv[0];
+        }
+        // それもダメなら間合いが６以上を探して、最も間合いを保てる場所
+        const lb5 = backward.filter(te => te.card_rank + mae >= 6);
+        if (lb5.length !== 0) {
+          return this.rank_min(lb5);
         }
       } else {
         // 良さげな手が無いならやむなく後退
         // 間合いが５以下になる後退が存在しないなら、最も後を保てるカード
         return this.rank_min(backward);
       }
-    }
+    } // has backward
 
-    // 諦める
+    // 考えるのを諦める
     return this.random(legal);
   }
 }

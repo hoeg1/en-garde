@@ -22,6 +22,7 @@ const NAMES = ['宮本武蔵','佐々木小次郎',
   'フィオレ・リベリ', 'Ｄ・マクベイン',
   'リヒテンアウア', 'マッド・ジャック','聖ジョルジュ',
   'Ｊ・ドヴィーニ', 'ランスロット','アーサー王',
+  'W.ターナーJr.', 'ロロノア',
 ];
 
 //////////////////////////////////////////////////////////////////////////////
@@ -94,8 +95,9 @@ export default class Lv0 extends Player {
     const a = name.split().reduce((a, ch) => a + ch.charCodeAt(0), 0) % 1000 + 1;
     // 0~1
     this.seikaku = a * 0.001;
+    if (this.seikaku > 1) throw new Error('panic');
     // 疑似乱数も使いたいから（念のため新規に）作っておく
-    this.rnd = new Rand(rnd.rand(123456789)+1);
+    this.rnd = new Rand(rnd.next());
   }
 
   /**
