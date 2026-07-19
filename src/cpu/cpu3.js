@@ -343,9 +343,9 @@ export default class Lv3 extends Lv0 {
       // そのうちで、攻撃＝反撃されても確実に防御できる間合いの前進を選択
       // このあとの補充で終わる = 手札判定になる場合を含む
       const fight_back = b5.filter( te => {
-        const k = mae - te.card_rank;
-        // その手札を移動に使っている場合は差し引く必要がある
-        const p = this.hand.has(k) - (k===te.card_rank? 1: 0);
+        const k = mae + te.card_rank;
+        // 前進ではないからここの引き算は不要
+        const p = this.hand.has(k);// - (k===te.card_rank? 1: 0);
         te.bl_p = p;
         return p >= phand[k];
       });
@@ -485,7 +485,8 @@ export default class Lv3 extends Lv0 {
       if (f5.length !== 0) {
         const fight_back = f5.filter( te => {
           const k = mae - te.card_rank;
-          // その手札を前進に使っている場合は差し引く必要がある
+          // 間合いが２で１前進の場合、みたい枚数は「１」のカード
+          // ＝＞その手札を前進に使っている場合は差し引く必要がある
           return this.hand.has(k) - (k===te.card_rank? 1: 0) > phand[k];
         });
         if (fight_back.length !== 0) {
@@ -515,9 +516,9 @@ export default class Lv3 extends Lv0 {
       // そのうちで、攻撃されても確実に防御できる間合いの前進を選択
       if (b5.length !== 0) {
         const fight_back = b5.filter( te => {
-          const k = mae - te.card_rank;
-          // その手札を移動に使っている場合は差し引く必要がある
-          return this.hand.has(k) - (k===te.card_rank? 1: 0) > phand[k];
+          const k = mae + te.card_rank;
+          // 後退だから差し引く必要はない
+          return this.hand.has(k) > phand[k];
         });
         if (fight_back.length !== 0) {
           // 最も少ない後退で済むのを返す
