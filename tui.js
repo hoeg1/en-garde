@@ -10,6 +10,7 @@ import {
   Board,
   sleep,
   VERSION,
+  calc_legal,
 } from "./src/engarde.js";
 import Lv0 from "./src/cpu/cpu.js";
 import Lv1 from "./src/cpu/cpu1.js";
@@ -54,9 +55,10 @@ class TPad {
   /**
    * @param {Board} board
    */
-  get_te(board, solv) {
-    if (board.is_attack) {
-      this.menu[0] = {te:Te.make_resign(Te.Penetrated), txt:"Resign"}; // 防御不可能
+  get_te(board, legal, solv) {
+    const resign_only = legal.length === 1 && legal[0].type === Te.Resign;
+    if (resign_only) {
+      this.menu[0] = {te:legal[0], txt:"Resign"}; // これしかできない
       this.menu_pos = 0;
     }
     input.setRawMode(true);
@@ -105,7 +107,7 @@ class TPad {
         }
         if (f) {
           if (sels.length === 0) { all_off(); }
-          this.menu[0] = {te:Te.make_resign(Te.NoReason),txt:'Resign'};
+          this.menu[0] = {te:resign_only? legal[0]: Te.make_resign(Te.NoReason),txt:'Resign'};
           this.menu[1] = {te:null,txt:''};
           this.menu[2] = {te:null,txt:''};
           this.menu_pos = 0;
@@ -234,9 +236,10 @@ class Human extends Player {
    * @return {Promise}
    */
   async on_turn(board) {
+    const legal = calc_legal(this.hand, board);
     const pad = new TPad(this.hand);
     return new Promise(solv => {
-      pad.get_te(board, solv);
+      pad.get_te(board, legal, solv);
     });
   }
 }
